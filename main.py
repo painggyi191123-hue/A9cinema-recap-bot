@@ -230,7 +230,7 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "[1:a]aresample=44100,aformat=channel_layouts=stereo[a1];"
             "[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
             "-map", "[outv]", "-map", "[outa]",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
             "-c:a", "aac", 
             final_path
         ]
