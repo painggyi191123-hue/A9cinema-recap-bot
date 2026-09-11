@@ -213,20 +213,49 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "-c:a", "aac", "-ar", "44100", "-ac", "2",
             hook_path
         ]
-        await asyncio.to_thread(subprocess.run, hook_cmd, stdout=subprocess.DEVNULL)
+                await asyncio.to_thread(subprocess.run, hook_cmd, stdout=subprocess.DEVNULL)
 
         await status_msg.edit_text("🔗 Hook နှင့် ရုပ်ရှင် ပေါင်းစပ်နေပါတယ်...")
 
+        # --- STANDARDIZE & MERGE HOOK + MAIN ---
+        standard_hook_path = os.path.join(job_dir, "std_hook.mp4")
+        standard_main_path = os.path.join(job_dir, "std_main.mp4")
+
+        # Hook ကို Standardize လုပ်ခြင်း
+        std_hook_cmd = [
+            "ffmpeg", "-y", "-i", hook_path,
+            "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+            "-c:a", "aac", "-ar", "44100", "-ac", "2",
+            standard_hook_path
+        ]
+        await asyncio.to_thread(subprocess.run, std_hook_cmd, stdout=subprocess.DEVNULL)
+
+        # Main ဗီဒီယိုကို Standardize လုပ်ခြင်း
+        std_main_cmd = [
+            "ffmpeg", "-y", "-i", main_synced_path,
+            "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+            "-c:a", "aac", "-ar", "44100", "-ac", "2",
+            standard_main_path
+        ]
+        await asyncio.to_thread(subprocess.run, std_main_cmd, stdout=subprocess.DEVNULL)
+
         concat_txt = os.path.join(job_dir, "concat.txt")
         with open(concat_txt, "w") as f:
-            f.write(f"file '{hook_path}'\n")
-            f.write(f"file '{main_synced_path}'\n")
+            f.write(f"file '{standard_hook_path}'\n")
+            f.write(f"file '{standard_main_path}'\n")
 
         final_path = os.path.join(job_dir, f"Final_Recap_{message.message_id}.mp4")
         concat_cmd = [
             "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_txt,
-            "-c", "copy", final_path
+            "-c:v", "libx264", "-c:a", "aac", final_path
         ]
+        await asyncio.to_thread(subprocess.run, concat_cmd, stdout=subprocess.DEVNULL)
+
+        if not os.path.exists(final_path):
+            raise Exception("Final Video ဖိုင် ထွက်လာခြင်း မရှိပါ။ FFmpeg ပေါင်းစပ်မှု အမှားရှိနေပါသည်။")
+
         await asyncio.to_thread(subprocess.run, concat_cmd, stdout=subprocess.DEVNULL)
 
         await status_msg.edit_text("🎬 ပြီးပါပြီ! အပြီးသတ် ဗီဒီယို ပို့နေပါပြီ...")
