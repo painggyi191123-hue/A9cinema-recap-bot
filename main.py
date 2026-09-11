@@ -213,7 +213,7 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "-c:a", "aac", "-ar", "44100", "-ac", "2",
             hook_path
         ]
-                await asyncio.to_thread(subprocess.run, hook_cmd, stdout=subprocess.DEVNULL)
+        await asyncio.to_thread(subprocess.run, hook_cmd, stdout=subprocess.DEVNULL)
 
         await status_msg.edit_text("🔗 Hook နှင့် ရုပ်ရှင် ပေါင်းစပ်နေပါတယ်...")
 
