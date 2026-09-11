@@ -106,7 +106,7 @@ Format:
 Previous Memory: {json.dumps(memory_data, ensure_ascii=False)}
 """
 
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
     data = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
