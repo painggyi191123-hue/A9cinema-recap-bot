@@ -1,3 +1,5 @@
 python-telegram-bot
 google-generativeai
-
+python-dotenv
+edge-tts
+httpx
