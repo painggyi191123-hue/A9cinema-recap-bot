@@ -93,8 +93,8 @@ def create_recap_data(memory_data):
 
     genai.configure(api_key=api_key)
     
-    # တရားဝင် အလုပ်လုပ်သော Gemini မော်ဒယ်ကို ချိတ်ဆက်ခြင်း
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    # Google ညွှန်ကြားထားသော မော်ဒယ်အသစ် (gemini-3.6-flash) သို့ ချိတ်ဆက်ခြင်း
+    model = genai.GenerativeModel('gemini-3.6-flash')
 
     prompt = f"""You are a professional Myanmar movie recap script writer.
 Task Requirements:
