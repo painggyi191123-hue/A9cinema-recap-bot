@@ -215,48 +215,30 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         await asyncio.to_thread(subprocess.run, hook_cmd, stdout=subprocess.DEVNULL)
 
-        await status_msg.edit_text("🔗 Hook နှင့် ရုပ်ရှင်ကို ပုံစံတူညှိပြီး ပေါင်းစပ်နေပါတယ်...")
-
-        # ၁။ Hook ကို Standardize လုပ်ခြင်း
-        std_hook_path = os.path.join(job_dir, "std_hook.mp4")
-        std_hook_cmd = [
-            "ffmpeg", "-y", "-i", hook_path,
-            "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30",
-            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
-            "-c:a", "aac", "-ar", "44100", "-ac", "2",
-            std_hook_path
-        ]
-        await asyncio.to_thread(subprocess.run, std_hook_cmd, stdout=subprocess.DEVNULL)
-
-        # ၂။ Main ဗီဒီယိုကို Standardize လုပ်ခြင်း
-        std_main_path = os.path.join(job_dir, "std_main.mp4")
-        std_main_cmd = [
-            "ffmpeg", "-y", "-i", main_synced_path,
-            "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30",
-            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
-            "-c:a", "aac", "-ar", "44100", "-ac", "2",
-            std_main_path
-        ]
-        await asyncio.to_thread(subprocess.run, std_main_cmd, stdout=subprocess.DEVNULL)
-
-        # ၃. Concat List ဖန်တီး၍ ပေါင်းစပ်ခြင်း
-        list_file_path = os.path.join(job_dir, "concat_list.txt")
-        with open(list_file_path, "w") as f:
-            f.write(f"file '{std_hook_path}'\n")
-            f.write(f"file '{std_main_path}'\n")
+        await status_msg.edit_text("🔗 Hook နှင့် ရုပ်ရှင်ကို အမြန်နှုန်းမြှင့် ပေါင်းစပ်နေပါတယ်...")
 
         final_path = os.path.join(job_dir, f"Final_Recap_{message.message_id}.mp4")
+        
         merge_cmd = [
-            "ffmpeg", "-y",
-            "-f", "concat", "-safe", "0",
-            "-i", list_file_path,
-            "-c", "copy",
+            "ffmpeg", "-y", 
+            "-i", hook_path, 
+            "-i", main_synced_path,
+            "-filter_complex", 
+            "[0:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30[v0];"
+            "[0:a]aresample=44100,aformat=channel_layouts=stereo[a0];"
+            "[1:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30[v1];"
+            "[1:a]aresample=44100,aformat=channel_layouts=stereo[a1];"
+            "[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
+            "-map", "[outv]", "-map", "[outa]",
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+            "-c:a", "aac", 
             final_path
         ]
         await asyncio.to_thread(subprocess.run, merge_cmd, stdout=subprocess.DEVNULL)
 
         if not os.path.exists(final_path):
-            raise Exception("Final Video ဖိုင် ထွက်လာခြင်း မရှိပါ။ FFmpeg Concat အမှားရှိနေပါသည်။")
+            raise Exception("Final Video ဖိုင် ထွက်လာခြင်း မရှိပါ။ FFmpeg Filter Concat အမှားရှိနေပါသည်။")
+
 
         # Main ဗီဒီယိုကို Standardize လုပ်ခြင်း
         std_main_cmd = [
