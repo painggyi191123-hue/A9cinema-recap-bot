@@ -93,7 +93,7 @@ def create_recap_data(memory_data):
 
     genai.configure(api_key=api_key)
     
-    # Google ညွှန်ကြားထားသော မော်ဒယ်အသစ် (gemini-3.6-flash) သို့ ချိတ်ဆက်ခြင်း
+    # Standard ဖြစ်သော gemini-1.5-flash သို့ ပြောင်းထားပါသည်
     model = genai.GenerativeModel('gemini-3.6-flash')
 
     prompt = f"""You are a professional Myanmar movie recap script writer.
@@ -137,11 +137,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
+    job_dir = None
     try:
         job_dir = create_job_folder()
         status_msg = await message.reply_text("📥 ဗီဒီယိုဖိုင် အချက်အလက်များကို ရယူနေပါတယ်...")
 
-        # ဗီဒီယို (သို့မဟုတ် ဖိုင်တွဲ) အချက်အလက်ရယူခြင်း
         video = message.video or message.document
         if not video:
             await message.reply_text("❌ ကျေးဇူးပြု၍ ဗီဒီယိုဖိုင် ပို့ပေးပါ။")
@@ -149,13 +149,12 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         file_id = video.file_id
         file_info = await context.bot.get_file(file_id)
-        file_url = file_info.file_path  # Telegram ကပေးသော တိုက်ရိုက်လင့်ခ်
+        file_url = file_info.file_path
 
         video_path = os.path.join(job_dir, f"video_{message.message_id}.mp4")
         
         await status_msg.edit_text("📥 ဗီဒီယိုဖိုင် ကြီးမားသော်လည်း တိုက်ရိုက် Download ဆွဲနေပါပြီ... ခဏစောင့်ပါ ⏳")
 
-        # 20 MB ကန့်သတ်ချက်ကျော်လွန်၍ တိုက်ရိုက် Download ဆွဲခြင်း
         def download_file():
             urllib.request.urlretrieve(file_url, video_path)
 
@@ -235,44 +234,14 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
             final_path
         ]
         
-        # Error အမှန်ကို ဖမ်းယူရန် capture_output=True သုံးခြင်း
         result = await asyncio.to_thread(subprocess.run, merge_cmd, capture_output=True, text=True)
         
         if result.returncode != 0:
-            error_msg = result.stderr[-500:] # နောက်ဆုံး Error စာသား အတိုစုပြရန်
+            error_msg = result.stderr[-500:]
             raise Exception(f"FFmpeg Error: {error_msg}")
 
         if not os.path.exists(final_path):
             raise Exception("Final Video ဖိုင် ထွက်လာခြင်း မရှိပါ။")
-
-
-
-        # Main ဗီဒီယိုကို Standardize လုပ်ခြင်း
-        std_main_cmd = [
-            "ffmpeg", "-y", "-i", main_synced_path,
-            "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-            "-c:a", "aac", "-ar", "44100", "-ac", "2",
-            standard_main_path
-        ]
-        await asyncio.to_thread(subprocess.run, std_main_cmd, stdout=subprocess.DEVNULL)
-
-        concat_txt = os.path.join(job_dir, "concat.txt")
-        with open(concat_txt, "w") as f:
-            f.write(f"file '{standard_hook_path}'\n")
-            f.write(f"file '{standard_main_path}'\n")
-
-        final_path = os.path.join(job_dir, f"Final_Recap_{message.message_id}.mp4")
-        concat_cmd = [
-            "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_txt,
-            "-c:v", "libx264", "-c:a", "aac", final_path
-        ]
-        await asyncio.to_thread(subprocess.run, concat_cmd, stdout=subprocess.DEVNULL)
-
-        if not os.path.exists(final_path):
-            raise Exception("Final Video ဖိုင် ထွက်လာခြင်း မရှိပါ။ FFmpeg ပေါင်းစပ်မှု အမှားရှိနေပါသည်။")
-
-        await asyncio.to_thread(subprocess.run, concat_cmd, stdout=subprocess.DEVNULL)
 
         await status_msg.edit_text("🎬 ပြီးပါပြီ! အပြီးသတ် ဗီဒီယို ပို့နေပါပြီ...")
         with open(final_path, "rb") as video_file:
@@ -282,12 +251,14 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML", read_timeout=1200, write_timeout=1200
             )
 
-        if os.path.exists(job_dir):
+        if job_dir and os.path.exists(job_dir):
             shutil.rmtree(job_dir)
 
     except Exception as e:
         print("BOT ERROR:", repr(e))
         await message.reply_text("❌ Error ဖြစ်သွားပါတယ်!\n\n" + str(e))
+        if job_dir and os.path.exists(job_dir):
+            shutil.rmtree(job_dir)
 
 def main():
     if not TOKEN:
@@ -313,3 +284,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
