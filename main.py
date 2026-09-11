@@ -7,6 +7,8 @@ import urllib.request
 import time
 import asyncio
 import shutil
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 from dotenv import load_dotenv
 from telegram import Update
@@ -23,12 +25,28 @@ load_dotenv()
 
 TOKEN = os.getenv("BOT_TOKEN")
 DOWNLOAD_DIR = "downloads"
-MEMORY_FILE = "series_memory.json" # အချက် ၉ - မှတ်ဉာဏ်ဖိုင်
+MEMORY_FILE = "series_memory.json"
 
 WHISPER_BIN = os.path.expanduser("~/whisper.cpp/build/bin/whisper-cli")
 WHISPER_MODEL = os.path.expanduser("~/whisper.cpp/models/ggml-tiny.bin")
 
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+# ==============================
+# Render Port Check အတွက် Web Server ငယ်
+# ==============================
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is alive and running!")
+    def log_message(self, format, *args):
+        pass # Log တွေ ရှုပ်မနေအောင် ပိတ်ထားသည်
+
+def run_health_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
+    server.serve_forever()
 
 # ==============================
 # ၁။ မှတ်ဉာဏ်စနစ် (Series Memory)
@@ -105,7 +123,7 @@ Transcript:
         "generationConfig": {
             "temperature": 0.7,
             "maxOutputTokens": 4096,
-            "responseMimeType": "application/json" # JSON သီးသန့်ထုတ်ပေးရန်
+            "responseMimeType": "application/json"
         }
     }
 
@@ -120,8 +138,6 @@ Transcript:
                 result = json.loads(response.read().decode("utf-8"))
             
             raw_response = result["candidates"][0]["content"]["parts"][0]["text"].strip()
-            
-            # JSON Parse လုပ်ခြင်း
             response_data = json.loads(raw_response)
             return response_data
 
@@ -143,23 +159,20 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
         job_dir = create_job_folder()
         status_msg = await message.reply_text("📥 Video ကို Download လုပ်နေပါတယ်...")
 
-        # --- 1. DOWNLOAD VIDEO ---
         video = message.video
         file = await context.bot.get_file(video.file_id)
         video_path = os.path.join(job_dir, f"video_{message.message_id}.mp4")
         await file.download_to_drive(video_path)
 
-        # --- 2. EXTRACT AUDIO ---
-        audio_path = os.path.join(job_dir, f"audio_{message.message_id}.wav") # Whisper အတွက် wav ပြောင်း
+        audio_path = os.path.join(job_dir, f"audio_{message.message_id}.wav")
         subprocess.run(["ffmpeg", "-y", "-i", video_path, "-vn", "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", audio_path], stdout=subprocess.DEVNULL)
 
         await status_msg.edit_text("🤖 Whisper ဖြင့် စာသားနှင့် အချိန်အမှတ် (SRT) ဖမ်းနေပါတယ်...")
 
-        # --- 3. WHISPER (SRT ထုတ်ခြင်း - အချက် ၁) ---
         text_base = os.path.join(job_dir, f"transcript_{message.message_id}")
         whisper_command = [
             WHISPER_BIN, "-m", WHISPER_MODEL, "-f", audio_path,
-            "-l", "zh", "-t", "4", "-osrt", "-of", text_base # -otxt အစား -osrt သုံးသည်
+            "-l", "zh", "-t", "4", "-osrt", "-of", text_base
         ]
         await asyncio.to_thread(subprocess.run, whisper_command, stdout=subprocess.DEVNULL)
         
@@ -167,7 +180,6 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not os.path.exists(srt_path):
             raise Exception("Whisper SRT ဖိုင် မထွက်လာပါ။")
 
-        # SRT ဖိုင်ကို Telegram တွင် ပြန်ပို့ပေးခြင်း (အချက် ၂)
         with open(srt_path, "rb") as srt_file:
             await message.reply_document(document=srt_file, caption="📄 ထုတ်ယူရရှိသော SRT (အချိန်အမှတ်) ဖိုင်")
 
@@ -176,38 +188,26 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await status_msg.edit_text("🧠 Gemini မှ ဇာတ်လမ်း၊ Hook နှင့် ဇာတ်ကောင်များကို စဉ်းစားတွက်ချက်နေပါတယ်...")
 
-        # --- 4. GEMINI AI (Hook + Memory + Long Story) ---
         memory_data = load_memory()
         recap_data = create_recap_data(transcript, memory_data)
         
         hook_time = recap_data.get("hook_time", "00:00:10")
         raw_script = recap_data.get("myanmar_script", "ဇာတ်လမ်းအကျဉ်း...")
         
-        # မှတ်ဉာဏ် အသစ်ပြန်သိမ်းခြင်း (အချက် ၉)
         if "characters" in recap_data:
             memory_data["characters"].update(recap_data["characters"])
             save_memory(memory_data)
 
-        # မြန်မာစာ Space ရှင်းလင်းခြင်း (အချက် ၄)
         clean_script = raw_script.replace(" ", "")
 
         await status_msg.edit_text(f"🎙️ AI Voice ဖန်တီးနေပါတယ်... (Hook Time: {hook_time})")
 
-        # --- 5. CREATE VOICE ---
         voice_path = os.path.join(job_dir, f"voice_{message.message_id}.mp3")
         await create_myanmar_voice(clean_script, voice_path)
 
         await status_msg.edit_text("🛡️ Video ကို Copyright ရှောင်ရန်၊ တရုတ်စာတန်းဝါးရန်နှင့် ညှိနှိုင်းရန် ပြင်ဆင်နေပါတယ်...")
 
-        # --- 6. MAIN VIDEO PROCESSING (အချက် ၆, ၇, ၈, ၁၁, ၁၂) ---
         main_synced_path = os.path.join(job_dir, "main_synced.mp4")
-        
-        # Filters များ: 
-        # hflip = Mirror (မှန်ပြောင်း), 
-        # drawbox = အောက်ခြေစာတန်းကို အမည်းရောင်ဘားဖြင့် ဖုံးခြင်း (Blur အစား အလုံခြုံဆုံးနည်းလမ်း)
-        # eq = အရောင် Color Grade တင်ခြင်း
-        # hue = ၃ စက္ကန့်တိုင်း Transition အလင်းအမှောင်ပြောင်းခြင်း
-        # tpad = Video တိုနေပါက Voice ပြီးသည်အထိ နောက်ဆုံး Frame ကို Freeze လုပ်ပေးထားခြင်း
         complex_filter = (
             "[0:v]hflip,"
             "drawbox=y=ih-120:color=black@1.0:width=iw:height=120:t=fill,"
@@ -222,16 +222,14 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "-map", "[v_out]", "-map", "1:a",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
             "-c:a", "aac", "-ar", "44100", "-ac", "2",
-            "-shortest", # Voice ကုန်သည်နှင့် ဗီဒီယိုပါ ရပ်တန့်မည်
+            "-shortest",
             main_synced_path
         ]
         await asyncio.to_thread(subprocess.run, main_process_cmd, stdout=subprocess.DEVNULL)
 
         await status_msg.edit_text("🔥 ၃ စက္ကန့်စာ Hook ဖြတ်ထုတ်နေပါတယ်...")
 
-        # --- 7. EXTRACT HOOK VIDEO (အချက် ၃) ---
         hook_path = os.path.join(job_dir, "hook.mp4")
-        # Hook ကိုလည်း Main Video နဲ့ Format တူအောင် Filter အတူတူထည့်ပါမည်
         hook_filter = (
             "[0:v]hflip,"
             "drawbox=y=ih-120:color=black@1.0:width=iw:height=120:t=fill,"
@@ -241,7 +239,7 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
         hook_cmd = [
             "ffmpeg", "-y", "-ss", hook_time, "-i", video_path, "-t", "3",
             "-filter_complex", hook_filter,
-            "-map", "[v_out]", "-map", "0:a?", # မူရင်းဗီဒီယို အသံကိုယူမည်
+            "-map", "[v_out]", "-map", "0:a?",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
             "-c:a", "aac", "-ar", "44100", "-ac", "2",
             hook_path
@@ -250,7 +248,6 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await status_msg.edit_text("🔗 Hook နှင့် မူရင်းရုပ်ရှင် ပေါင်းစပ်နေပါတယ်...")
 
-        # --- 8. MERGE HOOK + MAIN (အချက် ၅) ---
         concat_txt = os.path.join(job_dir, "concat.txt")
         with open(concat_txt, "w") as f:
             f.write(f"file '{hook_path}'\n")
@@ -263,7 +260,6 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         await asyncio.to_thread(subprocess.run, concat_cmd, stdout=subprocess.DEVNULL)
 
-        # --- 9. SEND FINAL VIDEO ---
         await status_msg.edit_text("🎬 လုပ်ငန်းစဉ်အားလုံး ပြီးစီးပါပြီ! ဗီဒီယို ပို့နေပါတယ်...")
         with open(final_path, "rb") as video_file:
             await message.reply_document(
@@ -272,7 +268,6 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML", read_timeout=900, write_timeout=900
             )
 
-        # --- AUTO CLEANUP ---
         if os.path.exists(job_dir):
             shutil.rmtree(job_dir)
             print(f"🧹 Auto Clean: {job_dir} deleted")
@@ -283,15 +278,17 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     if not TOKEN:
-        print("❌ BOT_TOKEN မတွေ့ပါ။ .env ဖိုင်ကို စစ်ပါ။")
+        print("❌ BOT_TOKEN မတွေ့ပါ။")
         return
+
+    # Render Portအတွက် Web Server ကို Background Thread ဖြင့် စတင်ခြင်း
+    threading.Thread(target=run_health_server, daemon=True).start()
+    print("🌐 Render Health Check Server started on port 10000...")
 
     request = HTTPXRequest(connect_timeout=120, read_timeout=900, write_timeout=900, pool_timeout=120, http_version="1.1")
     app = (
         Application.builder()
         .token(TOKEN)
-        .base_url("http://127.0.0.1:8081/bot")
-        .base_file_url("http://127.0.0.1:8081/file/bot")
         .request(request)
         .get_updates_request(request)
         .build()
@@ -299,8 +296,9 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.VIDEO | filters.Document.VIDEO, video_received))
 
-    print("🤖 Pro Movie Recap Bot is running with 12 Advanced Features...")
+    print("🤖 Pro Movie Recap Bot is running...")
     app.run_polling()
 
 if __name__ == "__main__":
     main()
+
