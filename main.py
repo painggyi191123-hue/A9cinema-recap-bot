@@ -215,7 +215,7 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         await asyncio.to_thread(subprocess.run, hook_cmd, stdout=subprocess.DEVNULL)
 
-        await status_msg.edit_text("🔗 Hook နှင့် ရုပ်ရှင်ကို အမြန်နှုန်းမြှင့် ပေါင်းစပ်နေပါတယ်...")
+        await status_msg.edit_text("🔗 Hook နှင့် ရုပ်ရှင်ကို ပေါင်းစပ်နေပါတယ်...")
 
         final_path = os.path.join(job_dir, f"Final_Recap_{message.message_id}.mp4")
         
@@ -234,10 +234,17 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "-c:a", "aac", 
             final_path
         ]
-        await asyncio.to_thread(subprocess.run, merge_cmd, stdout=subprocess.DEVNULL)
+        
+        # Error အမှန်ကို ဖမ်းယူရန် capture_output=True သုံးခြင်း
+        result = await asyncio.to_thread(subprocess.run, merge_cmd, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            error_msg = result.stderr[-500:] # နောက်ဆုံး Error စာသား အတိုစုပြရန်
+            raise Exception(f"FFmpeg Error: {error_msg}")
 
         if not os.path.exists(final_path):
-            raise Exception("Final Video ဖိုင် ထွက်လာခြင်း မရှိပါ။ FFmpeg Filter Concat အမှားရှိနေပါသည်။")
+            raise Exception("Final Video ဖိုင် ထွက်လာခြင်း မရှိပါ။")
+
 
 
         # Main ဗီဒီယိုကို Standardize လုပ်ခြင်း
