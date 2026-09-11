@@ -111,7 +111,7 @@ Previous Memory: {json.dumps(memory_data, ensure_ascii=False)}
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": 0.7,
-            "maxOutputTokens": 4096,
+            "maxOutputTokens": 8192,
             "responseMimeType": "application/json"
         }
     }
@@ -123,7 +123,7 @@ Previous Memory: {json.dumps(memory_data, ensure_ascii=False)}
                 headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
                 method="POST"
             )
-            with urllib.request.urlopen(request, timeout=120) as response:
+            with urllib.request.urlopen(request, timeout=180) as response:
                 result = json.loads(response.read().decode("utf-8"))
             
             raw_response = result["candidates"][0]["content"]["parts"][0]["text"].strip()
@@ -137,20 +137,35 @@ Previous Memory: {json.dumps(memory_data, ensure_ascii=False)}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🎬 Pro Movie Recap Bot အဆင်သင့်ဖြစ်ပါပြီ!\n"
-        "Video ပို့လိုက်တာနဲ့ AI က ချက်ချင်း Recap လုပ်ပေးပါမယ်။"
+        "🎬 Pro Movie Recap Bot (Unlimited Size) အဆင်သင့်ဖြစ်ပါပြီ!\n"
+        "ဗီဒီယို ဖိုင်အကြီးကြီးတွေကို ပို့လို့ရပါပြီ။"
     )
 
 async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     try:
         job_dir = create_job_folder()
-        status_msg = await message.reply_text("📥 Video ကို Download လုပ်နေပါတယ်...")
+        status_msg = await message.reply_text("📥 ဗီဒီယိုဖိုင် အချက်အလက်များကို ရယူနေပါတယ်...")
 
-        video = message.video
-        file = await context.bot.get_file(video.file_id)
+        # ဗီဒီယို (သို့မဟုတ် ဖိုင်တွဲ) အချက်အလက်ရယူခြင်း
+        video = message.video or message.document
+        if not video:
+            await message.reply_text("❌ ကျေးဇူးပြု၍ ဗီဒီယိုဖိုင် ပို့ပေးပါ။")
+            return
+
+        file_id = video.file_id
+        file_info = await context.bot.get_file(file_id)
+        file_url = file_info.file_path  # Telegram ကပေးသော တိုက်ရိုက်လင့်ခ်
+
         video_path = os.path.join(job_dir, f"video_{message.message_id}.mp4")
-        await file.download_to_drive(video_path)
+        
+        await status_msg.edit_text("📥 ဗီဒီယိုဖိုင် ကြီးမားသော်လည်း တိုက်ရိုက် Download ဆွဲနေပါပြီ... ခဏစောင့်ပါ ⏳")
+
+        # 20 MB ကန့်သတ်ချက်ကျော်လွန်၍ တိုက်ရိုက် Download ဆွဲခြင်း
+        def download_file():
+            urllib.request.urlretrieve(file_url, video_path)
+
+        await asyncio.to_thread(download_file)
 
         await status_msg.edit_text("🧠 Gemini မှ ဇာတ်လမ်းနှင့် Hook ကို စဉ်းစားနေပါတယ်...")
 
@@ -171,7 +186,7 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
         voice_path = os.path.join(job_dir, f"voice_{message.message_id}.mp3")
         await create_myanmar_voice(clean_script, voice_path)
 
-        await status_msg.edit_text("🛡️ Video ကို ပြင်ဆင်နေပါတယ်...")
+        await status_msg.edit_text("🛡️ Video ကို Copyright ရှောင်ရန် ပြင်ဆင်နေပါတယ်...")
 
         main_synced_path = os.path.join(job_dir, "main_synced.mp4")
         complex_filter = (
@@ -220,12 +235,12 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         await asyncio.to_thread(subprocess.run, concat_cmd, stdout=subprocess.DEVNULL)
 
-        await status_msg.edit_text("🎬 ပြီးပါပြီ! ဗီဒီယို ပို့နေပါတယ်...")
+        await status_msg.edit_text("🎬 ပြီးပါပြီ! အပြီးသတ် ဗီဒီယို ပို့နေပါပြီ...")
         with open(final_path, "rb") as video_file:
             await message.reply_document(
                 document=video_file, filename=os.path.basename(final_path),
-                caption="🎬 <b>Pro Myanmar Movie Recap</b>\n✨ Auto Hook\n🛡️ Copyright Bypassed",
-                parse_mode="HTML", read_timeout=900, write_timeout=900
+                caption="🎬 <b>Pro Myanmar Movie Recap (Unlimited)</b>\n✨ Auto Hook\n🛡️ Copyright Bypassed",
+                parse_mode="HTML", read_timeout=1200, write_timeout=1200
             )
 
         if os.path.exists(job_dir):
@@ -243,7 +258,7 @@ def main():
     threading.Thread(target=run_health_server, daemon=True).start()
     print("🌐 Render Health Check Server started...")
 
-    request = HTTPXRequest(connect_timeout=120, read_timeout=900, write_timeout=900, pool_timeout=120, http_version="1.1")
+    request = HTTPXRequest(connect_timeout=120, read_timeout=1200, write_timeout=1200, pool_timeout=120, http_version="1.1")
     app = (
         Application.builder()
         .token(TOKEN)
@@ -252,11 +267,10 @@ def main():
         .build()
     )
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.VIDEO | filters.Document.VIDEO, video_received))
+    app.add_handler(MessageHandler(filters.VIDEO | filters.Document.VIDEO | filters.Document.ALL, video_received))
 
     print("🤖 Bot is running...")
     app.run_polling()
 
 if __name__ == "__main__":
     main()
-
