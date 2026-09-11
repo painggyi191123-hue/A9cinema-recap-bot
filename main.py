@@ -81,6 +81,8 @@ async def create_myanmar_voice(text, output_path):
     if not os.path.exists(output_path):
         raise Exception("Voice MP3 မထွက်လာပါ။")
 
+import google.generativeai as genai
+
 # ==============================
 # Gemini AI (Recap + Hook + Memory)
 # ==============================
@@ -88,6 +90,11 @@ def create_recap_data(memory_data):
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise Exception("GEMINI_API_KEY မတွေ့ပါ။")
+
+    genai.configure(api_key=api_key)
+    
+    # တရားဝင် အလုပ်လုပ်သော Gemini မော်ဒယ်ကို ချိတ်ဆက်ခြင်း
+    model = genai.GenerativeModel('gemini-2.5-flash')
 
     prompt = f"""You are a professional Myanmar movie recap script writer.
 Task Requirements:
@@ -106,27 +113,13 @@ Format:
 Previous Memory: {json.dumps(memory_data, ensure_ascii=False)}
 """
 
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
-    data = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": 0.7,
-            "maxOutputTokens": 8192,
-            "responseMimeType": "application/json"
-        }
-    }
-
     for attempt in range(3):
         try:
-            request = urllib.request.Request(
-                url, data=json.dumps(data).encode("utf-8"),
-                headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
-                method="POST"
+            response = model.generate_content(
+                prompt,
+                generation_config={"response_mime_type": "application/json"}
             )
-            with urllib.request.urlopen(request, timeout=180) as response:
-                result = json.loads(response.read().decode("utf-8"))
-            
-            raw_response = result["candidates"][0]["content"]["parts"][0]["text"].strip()
+            raw_response = response.text.strip()
             return json.loads(raw_response)
 
         except Exception as e:
@@ -134,6 +127,7 @@ Previous Memory: {json.dumps(memory_data, ensure_ascii=False)}
                 time.sleep(5)
                 continue
             raise Exception("Gemini Recap Error:\n" + str(e))
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
