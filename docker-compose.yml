@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  telegram-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      API_ID: ${API_ID}
+      API_HASH: ${API_HASH}
+    volumes:
+      - ./api_data:/app/data
+
+  recap-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    restart: always
+    depends_on:
+      - telegram-api
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      API_SERVER_URL: http://telegram-api:8081
