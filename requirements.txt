@@ -1,5 +1,5 @@
-python-telegram-bot
-google-generativeai
-python-dotenv
-edge-tts
-httpx
+python-telegram-bot==20.7
+python-dotenv==1.0.1
+google-generativeai==0.7.2
+edge-tts==6.1.10
+httpx==0.27.0
