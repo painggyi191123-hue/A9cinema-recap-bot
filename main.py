@@ -350,13 +350,11 @@ def main():
             drop_pending_updates=True,
             allowed_updates=["message", "document", "video"],
             close_loop=False,
-            read_timeout=3600,
-            interval=2,           # စစ်ဆေးမှုအကြိမ်ကြား ကာလ – စက္ကန့် ၂
-            max_connections=1    # ✅ အရေးကြီး – ချိတ်ဆက်မှုတစ်ခုထဲသာ – ပဋိပက္ခမရှိတော့ဘူး
+            read_timeout=3600
+            # ✅ interval + max_connections – ဒီနှစ်ခုလုံး ဖယ်လိုက်ပြီ၊ မလိုအပ်တော့ဘူး
         )
     except Exception as e:
         print(f"⚠️ Polling ရပ်သွားပြီ: {e}")
-        # Render က သူ့ဘာသာ ပြန်စတင်ပေးမှာမို့ ဘာမှမလုပ်ပါနဲ့
         pass
 
 if __name__ == "__main__":
