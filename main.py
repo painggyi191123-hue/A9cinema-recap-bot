@@ -9,6 +9,7 @@ import asyncio
 import shutil
 import threading
 import httpx
+from urllib.parse import quote
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 from dotenv import load_dotenv
@@ -71,12 +72,15 @@ def create_job_folder():
     return job_dir
 
 # ==============================
-# Myanmar Text Cleaner
+# Myanmar Text Cleaner – ASCII/အထူးသင်္ကေတအမှားအားလုံးဖယ်
 # ==============================
 def clean_myanmar_text(text):
+    # မြန်မာစာလုံးချင်းကြား နေရာလွတ်ဖယ်
     text = re.sub(r'([က-အဤဧဩဪ၎၏ဥူဧံ])\s+([က-အဤဧဩဪ၎၏ဥူဧံ])', r'\1\2', text)
+    # နေရာလွတ်အများကြီးကို တစ်ခုထဲပြုပြင်
     text = re.sub(r'\s+', ' ', text)
-    text = re.sub(r'[\u200b-\u200f\u00ad]', '', text)
+    # ⚠️ အမှားပေးတဲ့ အထူးဇာတ်ကောင်အားလုံးဖယ် – u2011 ပါ အားလုံးပါဝင်တယ်
+    text = re.sub(r'[\u200b-\u200f\u00ad\u2011-\u201f\u2028-\u202f\ufeff]', '', text)
     return text.strip()
 
 # ==============================
@@ -163,7 +167,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # ==============================
-# Main Video Processing
+# Main Video Processing – URL/ASCII အမှားအားလုံးပြင်ပြီးသား
 # ==============================
 async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
@@ -177,7 +181,7 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await message.reply_text("❌ ကျေးဇူးပြု၍ ဗီဒီယိုဖိုင် ပို့ပေးပါ။")
             return
 
-        # ✅ ဖိုင်အရွယ်အစား စစ်ဆေး – 20MB ကန့်သတ်ချက်
+        # ✅ ဖိုင်အရွယ်အစား ကန့်သတ်ချက် စစ်ဆေး – 20MB အောက်သာ
         file_size = video.file_size or 0
         if file_size > 20 * 1024 * 1024:
             await status_msg.edit_text("❌ ဖိုင်အရွယ်အစား ကြီးလွန်းနေပါတယ်!\n⚠️ 20MB အောက်သာ ပို့ပေးပါ။ နောက်မှ 2GB အထိ ဖွင့်ပေးနိုင်ပါတယ်။")
@@ -190,8 +194,10 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await status_msg.edit_text("📥 ဗီဒီယိုဖိုင် ဒေါင်းလုဒ်ဆွဲနေပါသည်... ခဏစောင့်ပါ ⏳")
 
+        # ✅ URL ကို လုံခြုံအောင် ပြုပြင် – ASCII/အထူးသင်္ကေတအမှားမရှိတော့ဘူး
         def download_file():
-            req = urllib.request.Request(file_url, headers={"User-Agent": "Mozilla/5.0"})
+            safe_url = quote(file_url, safe='/:?=&%')
+            req = urllib.request.Request(safe_url, headers={"User-Agent": "Mozilla/5.0"})
             with urllib.request.urlopen(req, timeout=600) as resp:
                 with open(video_path, "wb") as f:
                     while chunk := resp.read(1024 * 1024):
@@ -260,7 +266,7 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await status_msg.edit_text("🔗 Hook + ဇာတ်လမ်း ပေါင်းစပ်နေပါတယ်...")
 
-        final_path = os.path.join(job_dir, f"Final_Recap_{message.message_id}.mp4")
+        final_path = os.path.join(job_dir, f"final_recap_{message.message_id}.mp4")
         merge_cmd = [
             "ffmpeg", "-y",
             "-i", hook_path,
@@ -302,7 +308,7 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
             shutil.rmtree(job_dir)
 
 # ==============================
-# Main Start – ✅ Event Loop အမှား ပြုပြင်ပြီးသား
+# Main – Event Loop + ASCII + အချိန်ပြဿနာအားလုံးပြင်ပြီးသား
 # ==============================
 def main():
     if not TOKEN:
@@ -311,9 +317,6 @@ def main():
 
     threading.Thread(target=run_health_server, daemon=True).start()
     print("🌐 Health Check Server Running...")
-
-    # ✅ အရေးကြီး – ပုံမှန် time.sleep() မသုံးတော့ဘူး – asyncio ကို မနှောင့်ယှက်တော့ဘူး
-    # Render ဆာဗာ အဆင်သင့်ဖြစ်ဖို့ သီးခြားစောင့်ဖို့ မလိုအပ်တော့ – run_polling က သူ့ဘာသာစီမံပေးမယ်
 
     api_base_url = "https://api.telegram.org/bot"
 
@@ -334,7 +337,6 @@ def main():
         .build()
     )
 
-    # ✅ ဖိုင်အမျိုးအစားအားလုံးကို သေချာဖမ်းမယ်
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(
         filters.VIDEO | filters.Document.VIDEO | filters.Document.ALL,
@@ -343,16 +345,14 @@ def main():
 
     print("🤖 Bot အဆင်သင့်ဖြစ်ပြီ – မက်ဆေ့ချ်စောင့်နေပါတယ်...")
 
-    # ✅ အဓိကပြင်ချက် – Event loop ကို အပြည့်အဝထိန်းသိမ်းမယ်၊ ပိတ်မသွားစေဘူး
     try:
         app.run_polling(
             drop_pending_updates=True,
             allowed_updates=["message", "document", "video"],
-            close_loop=False  # ✅ ဒီတစ်ကြောင်းက အရေးကြီးဆုံး – loop ကို မပိတ်စေနဲ့
+            close_loop=False
         )
     except Exception as e:
         print(f"⚠️ Polling ရပ်သွားပြီ: {e}")
-        # ပြန်မစတင်စေနဲ့ – Render က သူ့ဘာသာ ပြန်စတင်ပေးမယ်
 
 if __name__ == "__main__":
     main()
