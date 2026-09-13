@@ -1,6 +1,4 @@
-# ✅ အားလုံးသဟဇာတဖြစ်ပြီး တိုက်မိမှုမရှိတဲ့ အတည်ပြုဗားရှင်းများ
 python-telegram-bot==20.7
 python-dotenv==1.0.1
-google-generativeai==0.5.2
 edge-tts==6.1.10
-httpx>=0.25.2
+httpx==0.25.2
