@@ -112,7 +112,7 @@ def create_recap_data(memory_data):
         raise Exception("GEMINI_API_KEY မတွေ့ပါ။")
 
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    model = genai.GenerativeModel('gemini-3.6-flash')
 
     prompt = f"""You are a professional Myanmar movie recap script writer.
 
