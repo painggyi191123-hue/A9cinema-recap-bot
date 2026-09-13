@@ -305,21 +305,23 @@ def main():
     threading.Thread(target=run_health_server, daemon=True).start()
     print("🌐 Health Check Server Running...")
 
+    # ✅ ပထမဆုံးအကြိမ် နိုးချိန် ၄၀ စက္ကန့် စောင့်ပေး – ဒါကြောင့် အချိန်မကုန်တော့ဘူး
+    time.sleep(40)
+
+    api_base_url = "https://api.telegram.org/bot"
+
     request = HTTPXRequest(
-        connect_timeout=300,    # 5 မိနစ် → အရင် 120 ထက် ပိုကြီး
-        read_timeout=1800,      # 30 မိနစ်
+        connect_timeout=300,
+        read_timeout=1800,
         write_timeout=1800,
         pool_timeout=300,
         http_version="1.1"
     )
 
-
-    api_base_url = "https://api.telegram.org/bot"
-
     app = (
         Application.builder()
         .token(TOKEN)
-        .base_url(api_base_url)       # ✅ ဒီမှာထည့် – မှန်ကန်တဲ့နေရာ
+        .base_url(api_base_url)
         .request(request)
         .get_updates_request(request)
         .build()
