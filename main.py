@@ -158,7 +158,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🎬 Pro Movie Recap Bot အဆင်သင့်ဖြစ်ပါပြီ!\n"
         "⚠️ ပထမဆုံးအကြိမ် အသုံးပြုခြင်းအတွက် တစ်မိနစ်ခန့်စောင့်ပေးပါ – ဆာဗာအသစ်နိုးနေပါတယ် 😊\n"
-        "ဗီဒီယိုဖိုင် ပို့လိုက်ရုံနဲ့ အားလုံးအလုပ်လုပ်ပါလိမ့်မယ်။"
+        "ဗီဒီယိုဖိုင် ပို့လိုက်ရုံနဲ့ အားလုံးအလုပ်လုပ်ပါလိမ့်မယ်။\n"
+        "⚠️ ဖိုင်အရွယ်အစား 20MB အောက်သာ ပို့ပေးပါ။"
     )
 
 # ==============================
@@ -176,6 +177,12 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await message.reply_text("❌ ကျေးဇူးပြု၍ ဗီဒီယိုဖိုင် ပို့ပေးပါ။")
             return
 
+        # ✅ ဖိုင်အရွယ်အစား စစ်ဆေး – 20MB ကန့်သတ်ချက်
+        file_size = video.file_size or 0
+        if file_size > 20 * 1024 * 1024:
+            await status_msg.edit_text("❌ ဖိုင်အရွယ်အစား ကြီးလွန်းနေပါတယ်!\n⚠️ 20MB အောက်သာ ပို့ပေးပါ။ နောက်မှ 2GB အထိ ဖွင့်ပေးနိုင်ပါတယ်။")
+            return
+
         file_id = video.file_id
         file_info = await context.bot.get_file(file_id)
         file_url = file_info.file_path
@@ -184,7 +191,7 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await status_msg.edit_text("📥 ဗီဒီယိုဖိုင် ဒေါင်းလုဒ်ဆွဲနေပါသည်... ခဏစောင့်ပါ ⏳")
 
         def download_file():
-            req = urllib.request.Request(file_url, headers={"User‑Agent": "Mozilla/5.0"})
+            req = urllib.request.Request(file_url, headers={"User-Agent": "Mozilla/5.0"})
             with urllib.request.urlopen(req, timeout=600) as resp:
                 with open(video_path, "wb") as f:
                     while chunk := resp.read(1024 * 1024):
@@ -216,11 +223,11 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
         complex_filter = (
             "[0:v]hflip,"
             "scale=iw*0.985:ih*0.985,"
-            "pad=1280:720:(ow‑iw)/2:(oh‑ih)/2,"
+            "pad=1280:720:(ow-iw)/2:(oh-ih)/2,"
             "eq=contrast=1.07:saturation=1.12:brightness=0.01,"
             "gblur=sigma=0.15,"
             "noise=alls=2:allt=t,"
-            "drawbox=y=ih‑120:color=black@1.0:width=iw:height=120:t=fill,"
+            "drawbox=y=ih-120:color=black@1.0:width=iw:height=120:t=fill,"
             "tpad=stop_mode=clone:stop_duration=999[v_out]"
         )
 
@@ -231,7 +238,7 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "-map_metadata", "-1", "-bitexact",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
             "-c:a", "aac", "-ar", "44100", "-ac", "2",
-            "-af", "loudnorm=I=‑14:LRA=7:TP=‑2,atempo=1.05",
+            "-af", "loudnorm=I=-14:LRA=7:TP=-2,atempo=1.05",
             "-shortest",
             main_synced_path
         ]
@@ -240,7 +247,7 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await status_msg.edit_text("🔥 ၃ စက္ကန့် Hook ဖြတ်ထုတ်နေပါတယ်...")
 
         hook_path = os.path.join(job_dir, "hook.mp4")
-        hook_filter = "[0:v]hflip,scale=iw*0.985:ih*0.985,pad=1280:720:(ow‑iw)/2:(oh‑ih)/2,eq=contrast=1.07:saturation=1.12:brightness=0.01,gblur=sigma=0.15,noise=alls=2:allt=t,drawbox=y=ih‑120:color=black@1.0:width=iw:height=120:t=fill[v_out]"
+        hook_filter = "[0:v]hflip,scale=iw*0.985:ih*0.985,pad=1280:720:(ow-iw)/2:(oh-ih)/2,eq=contrast=1.07:saturation=1.12:brightness=0.01,gblur=sigma=0.15,noise=alls=2:allt=t,drawbox=y=ih-120:color=black@1.0:width=iw:height=120:t=fill[v_out]"
         hook_cmd = [
             "ffmpeg", "-y", "-ss", hook_time, "-i", video_path, "-t", "3",
             "-filter_complex", hook_filter,
@@ -259,9 +266,9 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "-i", hook_path,
             "-i", main_synced_path,
             "-filter_complex",
-            "[0:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow‑iw)/2:(oh‑ih)/2,fps=30[v0];"
+            "[0:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30[v0];"
             "[0:a]aresample=44100,aformat=channel_layouts=stereo[a0];"
-            "[1:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow‑iw)/2:(oh‑ih)/2,fps=30[v1];"
+            "[1:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30[v1];"
             "[1:a]aresample=44100,aformat=channel_layouts=stereo[a1];"
             "[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
             "-map", "[outv]", "-map", "[outa]",
@@ -295,7 +302,7 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
             shutil.rmtree(job_dir)
 
 # ==============================
-# Main Start – ✅ ပြင်ပြီးသား
+# Main Start – ✅ Event Loop အမှား ပြုပြင်ပြီးသား
 # ==============================
 def main():
     if not TOKEN:
@@ -305,15 +312,14 @@ def main():
     threading.Thread(target=run_health_server, daemon=True).start()
     print("🌐 Health Check Server Running...")
 
-    # ✅ အရေးကြီး – Render ဆာဗာ အပြည့်အဝနိုးဖို့ စောင့်ပေး – ဒါမှမဟုတ် ချိတ်ဆက်မှုပျက်တယ်
-    time.sleep(45)
+    # ✅ အရေးကြီး – ပုံမှန် time.sleep() မသုံးတော့ဘူး – asyncio ကို မနှောင့်ယှက်တော့ဘူး
+    # Render ဆာဗာ အဆင်သင့်ဖြစ်ဖို့ သီးခြားစောင့်ဖို့ မလိုအပ်တော့ – run_polling က သူ့ဘာသာစီမံပေးမယ်
 
-    # ✅ တရားဝင် Telegram API – ဒီလိပ်စာအတိအကျသုံးပါ
     api_base_url = "https://api.telegram.org/bot"
 
     request = HTTPXRequest(
-        connect_timeout=300,    # 5 မိနစ် – ချိတ်ဆက်ဖို့ အချိန်အလုံအလောက်
-        read_timeout=1800,      # 30 မိနစ်
+        connect_timeout=300,
+        read_timeout=1800,
         write_timeout=1800,
         pool_timeout=300,
         http_version="1.1"
@@ -328,11 +334,25 @@ def main():
         .build()
     )
 
+    # ✅ ဖိုင်အမျိုးအစားအားလုံးကို သေချာဖမ်းမယ်
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.VIDEO | filters.Document.VIDEO | filters.Document.ALL, video_received))
+    app.add_handler(MessageHandler(
+        filters.VIDEO | filters.Document.VIDEO | filters.Document.ALL,
+        video_received
+    ))
 
     print("🤖 Bot အဆင်သင့်ဖြစ်ပြီ – မက်ဆေ့ချ်စောင့်နေပါတယ်...")
-    app.run_polling(drop_pending_updates=True)  # ✅ အသစ် – အရင်ကျန်နေတဲ့ မက်ဆေ့ချ်တွေ ဖယ်ပြီး အသစ်ကိုသာ ဖတ်တယ်
+
+    # ✅ အဓိကပြင်ချက် – Event loop ကို အပြည့်အဝထိန်းသိမ်းမယ်၊ ပိတ်မသွားစေဘူး
+    try:
+        app.run_polling(
+            drop_pending_updates=True,
+            allowed_updates=["message", "document", "video"],
+            close_loop=False  # ✅ ဒီတစ်ကြောင်းက အရေးကြီးဆုံး – loop ကို မပိတ်စေနဲ့
+        )
+    except Exception as e:
+        print(f"⚠️ Polling ရပ်သွားပြီ: {e}")
+        # ပြန်မစတင်စေနဲ့ – Render က သူ့ဘာသာ ပြန်စတင်ပေးမယ်
 
 if __name__ == "__main__":
     main()
