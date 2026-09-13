@@ -314,7 +314,7 @@ def main():
         http_version="1.1"
     )
 
-    api_base_url = "http://telegram-api:8081/bot"  # ✅ သီးခြားသတ်မှတ်
+    api_base_url = "https://api.telegram.org/bot"
 
     app = (
         Application.builder()
