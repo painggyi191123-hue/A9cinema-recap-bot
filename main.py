@@ -305,14 +305,15 @@ def main():
     threading.Thread(target=run_health_server, daemon=True).start()
     print("🌐 Health Check Server Running...")
 
-    # ✅ ပထမဆုံးအကြိမ် နိုးချိန် ၄၀ စက္ကန့် စောင့်ပေး – ဒါကြောင့် အချိန်မကုန်တော့ဘူး
-    time.sleep(40)
+    # ✅ အရေးကြီး – Render ဆာဗာ အပြည့်အဝနိုးဖို့ စောင့်ပေး – ဒါမှမဟုတ် ချိတ်ဆက်မှုပျက်တယ်
+    time.sleep(45)
 
+    # ✅ တရားဝင် Telegram API – ဒီလိပ်စာအတိအကျသုံးပါ
     api_base_url = "https://api.telegram.org/bot"
 
     request = HTTPXRequest(
-        connect_timeout=300,
-        read_timeout=1800,
+        connect_timeout=300,    # 5 မိနစ် – ချိတ်ဆက်ဖို့ အချိန်အလုံအလောက်
+        read_timeout=1800,      # 30 မိနစ်
         write_timeout=1800,
         pool_timeout=300,
         http_version="1.1"
@@ -330,8 +331,8 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.VIDEO | filters.Document.VIDEO | filters.Document.ALL, video_received))
 
-    print("🤖 Bot Running...")
-    app.run_polling()
+    print("🤖 Bot အဆင်သင့်ဖြစ်ပြီ – မက်ဆေ့ချ်စောင့်နေပါတယ်...")
+    app.run_polling(drop_pending_updates=True)  # ✅ အသစ် – အရင်ကျန်နေတဲ့ မက်ဆေ့ချ်တွေ ဖယ်ပြီး အသစ်ကိုသာ ဖတ်တယ်
 
 if __name__ == "__main__":
     main()
