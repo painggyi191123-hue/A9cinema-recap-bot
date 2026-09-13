@@ -305,14 +305,14 @@ def main():
     threading.Thread(target=run_health_server, daemon=True).start()
     print("🌐 Health Check Server Running...")
 
-    # ✅ base_url ကို Application.builder() မှာ သတ်မှတ် – HTTPXRequest ထဲ မထည့်
     request = HTTPXRequest(
-        connect_timeout=120,
-        read_timeout=1200,
-        write_timeout=1200,
-        pool_timeout=120,
+        connect_timeout=300,    # 5 မိနစ် → အရင် 120 ထက် ပိုကြီး
+        read_timeout=1800,      # 30 မိနစ်
+        write_timeout=1800,
+        pool_timeout=300,
         http_version="1.1"
     )
+
 
     api_base_url = "https://api.telegram.org/bot"
 
