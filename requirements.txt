@@ -1,6 +1,5 @@
-python-telegram-bot==20.7
+python-telegram-bot==20.6
 python-dotenv==1.0.1
 google-generativeai==0.6.0
 edge-tts==6.1.10
-# ✅ httpx ကို ဗားရှင်းမချုပ်ပါနဲ့ – python‑telegram‑bot က သူ့လိုတဲ့ဟာကို သူရွေးမယ်
-httpx
+httpx==0.25.2
