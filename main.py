@@ -8,7 +8,7 @@ import time
 import asyncio
 import shutil
 import threading
-import httpx  # ✅ ထပ်ထည့် – API တိုက်ရိုက်ခေါ်ဖို့
+import httpx
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 from dotenv import load_dotenv
@@ -71,26 +71,23 @@ def create_job_folder():
     return job_dir
 
 # ==============================
-# Myanmar Text Cleaner (Fix: "နတ် ဆိုး" → "နတ်ဆိုး")
+# Myanmar Text Cleaner
 # ==============================
 def clean_myanmar_text(text):
-    # စာလုံးအတွင်း မလိုအပ်တဲ့ နေရာလွတ်ဖယ်
     text = re.sub(r'([က-အဤဧဩဪ၎၏ဥူဧံ])\s+([က-အဤဧဩဪ၎၏ဥူဧံ])', r'\1\2', text)
-    # နေရာလွတ်အများကြီးကို တစ်ခုထဲပြုပြင်
     text = re.sub(r'\s+', ' ', text)
-    # မမြင်ရတဲ့ အက္ခရာဖယ်
     text = re.sub(r'[\u200b-\u200f\u00ad]', '', text)
     return text.strip()
 
 # ==============================
-# Edge TTS – Fast & Clear Recap Speed
+# Edge TTS
 # ==============================
 async def create_myanmar_voice(text, output_path):
     command = [
         "edge-tts",
         "--voice", "my-MM-ThihaNeural",
-        "--rate", "+10%",      # ✅ မြန်မြန်၊ မပျင်းစရာ – Recap အတွက် အကောင်းဆုံး
-        "--pitch", "0Hz",      # သဘာဝအသံထိန်း
+        "--rate", "+10%",
+        "--pitch", "0Hz",
         "--text", text,
         "--write-media", output_path,
     ]
@@ -103,14 +100,13 @@ async def create_myanmar_voice(text, output_path):
         raise Exception("Voice MP3 မထွက်လာပါ။")
 
 # ==============================
-# Gemini API – Direct Call (SDK မသုံးတော့ဘူး = အမှားမရှိ)
+# Gemini API – Direct Call
 # ==============================
 def create_recap_data(memory_data):
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise Exception("GEMINI_API_KEY မတွေ့ပါ။")
 
-    # ✅ အတိအကျရှိတဲ့ မော်ဒယ်နာမည် – gemini-2.0-flash
     url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key={api_key}"
 
     prompt = f"""You are a professional Myanmar movie recap script writer.
@@ -187,7 +183,6 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await status_msg.edit_text("📥 ဗီဒီယိုဖိုင် ဒေါင်းလုဒ်ဆွဲနေပါသည်... ခဏစောင့်ပါ ⏳")
 
-        # ✅ Large‑file safe download
         def download_file():
             req = urllib.request.Request(file_url, headers={"User‑Agent": "Mozilla/5.0"})
             with urllib.request.urlopen(req, timeout=600) as resp:
@@ -209,7 +204,6 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
             memory_data["characters"].update(recap_data["characters"])
             save_memory(memory_data)
 
-        # ✅ Clean script properly
         clean_script_text = clean_myanmar_text(raw_script)
 
         await status_msg.edit_text(f"🎙️ အသံဖန်တီးနေပါတယ်... (Hook အချိန်: {hook_time})")
@@ -301,7 +295,7 @@ async def video_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
             shutil.rmtree(job_dir)
 
 # ==============================
-# Main Start
+# Main Start – ✅ ပြင်ပြီးသား
 # ==============================
 def main():
     if not TOKEN:
@@ -311,8 +305,8 @@ def main():
     threading.Thread(target=run_health_server, daemon=True).start()
     print("🌐 Health Check Server Running...")
 
+    # ✅ base_url ကို Application.builder() မှာ သတ်မှတ် – HTTPXRequest ထဲ မထည့်
     request = HTTPXRequest(
-        base_url="http://telegram-api:8081/bot",
         connect_timeout=120,
         read_timeout=1200,
         write_timeout=1200,
@@ -320,9 +314,12 @@ def main():
         http_version="1.1"
     )
 
+    api_base_url = "http://telegram-api:8081/bot"  # ✅ သီးခြားသတ်မှတ်
+
     app = (
         Application.builder()
         .token(TOKEN)
+        .base_url(api_base_url)       # ✅ ဒီမှာထည့် – မှန်ကန်တဲ့နေရာ
         .request(request)
         .get_updates_request(request)
         .build()
@@ -336,4 +333,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
