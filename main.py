@@ -320,11 +320,12 @@ def main():
 
     api_base_url = "https://api.telegram.org/bot"
 
+    # ✅ အချိန်တန်ဖိုးတွေကို ပိုကြီးလုပ် – နှေးတဲ့ဆာဗာနဲ့ ကိုက်ညီအောင်
     request = HTTPXRequest(
-        connect_timeout=300,
-        read_timeout=1800,
+        connect_timeout=600,     # 10 မိနစ် – ချိတ်ဆက်ဖို့ အချိန်ပိုပေး
+        read_timeout=3600,      # 60 မိနစ် – မက်ဆေ့ချ်စောင့်ဖို့ အချိန်အများကြီးပေး
         write_timeout=1800,
-        pool_timeout=300,
+        pool_timeout=600,
         http_version="1.1"
     )
 
@@ -345,14 +346,19 @@ def main():
 
     print("🤖 Bot အဆင်သင့်ဖြစ်ပြီ – မက်ဆေ့ချ်စောင့်နေပါတယ်...")
 
+    # ✅ အရေးကြီး – ပိုပြီးတည်ငြိမ်အောင် ပြင်ဆင်
     try:
         app.run_polling(
             drop_pending_updates=True,
             allowed_updates=["message", "document", "video"],
-            close_loop=False
+            close_loop=False,
+            # ✅ စောင့်ချိန်ကို တိုးလိုက် – မကြာခဏ အချိန်မကုန်တော့ဘူး
+            read_timeout=3600
         )
     except Exception as e:
         print(f"⚠️ Polling ရပ်သွားပြီ: {e}")
+        # ✅ Render က သူ့ဘာသာ ပြန်စတင်ပေးမှာမို့ – ဒီမှာ ဘာမှမလုပ်ပါနဲ့
+        pass
 
 if __name__ == "__main__":
     main()
