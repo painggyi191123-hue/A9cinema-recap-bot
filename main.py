@@ -8,6 +8,7 @@ import time
 import asyncio
 import shutil
 import threading
+import httpx  # ✅ ထပ်ထည့် – API တိုက်ရိုက်ခေါ်ဖို့
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 from dotenv import load_dotenv
@@ -101,18 +102,16 @@ async def create_myanmar_voice(text, output_path):
     if not os.path.exists(output_path):
         raise Exception("Voice MP3 မထွက်လာပါ။")
 
-import google.generativeai as genai
-
 # ==============================
-# Gemini – Professional Recap Script
+# Gemini API – Direct Call (SDK မသုံးတော့ဘူး = အမှားမရှိ)
 # ==============================
 def create_recap_data(memory_data):
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise Exception("GEMINI_API_KEY မတွေ့ပါ။")
 
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-3.6-flash')
+    # ✅ အတိအကျရှိတဲ့ မော်ဒယ်နာမည် – gemini-2.0-flash
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key={api_key}"
 
     prompt = f"""You are a professional Myanmar movie recap script writer.
 
@@ -138,14 +137,18 @@ Respond ONLY with raw JSON:
 Previous Memory: {json.dumps(memory_data, ensure_ascii=False)}
 """
 
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"responseMimeType": "application/json"}
+    }
+
     for attempt in range(3):
         try:
-            response = model.generate_content(
-                prompt,
-                generation_config={"response_mime_type": "application/json"}
-            )
-            raw_response = response.text.strip()
-            return json.loads(raw_response)
+            resp = httpx.post(url, json=payload, timeout=120)
+            resp.raise_for_status()
+            raw_response = resp.json()
+            text_result = raw_response["candidates"][0]["content"]["parts"][0]["text"].strip()
+            return json.loads(text_result)
         except Exception as e:
             if attempt < 2:
                 time.sleep(5)
@@ -308,8 +311,6 @@ def main():
     threading.Thread(target=run_health_server, daemon=True).start()
     print("🌐 Health Check Server Running...")
 
-    # ⚠️ Local Bot API Server သုံးချင်ရင် ဒီလိုပြောင်း –
-    # request = HTTPXRequest(base_url="http://localhost:8081/bot", ...)
     request = HTTPXRequest(
         base_url="http://telegram-api:8081/bot",
         connect_timeout=120,
